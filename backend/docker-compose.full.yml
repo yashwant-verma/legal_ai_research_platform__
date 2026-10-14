@@ -1,0 +1,25 @@
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    ports: ["27017:27017"]
+    volumes: ["legal_ai_mongo:/data/db"]
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    ports: ["6333:6333", "6334:6334"]
+    volumes: ["legal_ai_qdrant:/qdrant/storage"]
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on: [mongo, qdrant]
+    ports: ["8000:8000"]
+    volumes:
+      - ./data:/app/data
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      QDRANT_URL: http://qdrant:6333
+volumes:
+  legal_ai_mongo:
+  legal_ai_qdrant:

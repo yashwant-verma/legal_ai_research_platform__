@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Synthetic legal QA — review</title>
+<style>
+body{font:16px/1.55 system-ui,sans-serif;background:#f4f6fa;color:#18283c;margin:0}main{max-width:1100px;margin:auto;padding:24px}h1{margin:0}header{background:white;border-bottom:1px solid #d6dfeb;padding:20px;position:sticky;top:0;z-index:1}header>div{max-width:1100px;margin:auto}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}button,select,input,textarea{font:inherit;padding:9px;border:1px solid #a7b5c9;border-radius:6px}button{cursor:pointer;background:#153c72;color:white}button:disabled{opacity:.45;cursor:not-allowed}input,textarea{background:white}textarea{width:95%;min-height:60px}article{background:white;border:1px solid #d6dfeb;border-radius:10px;padding:22px;margin:20px 0}pre,.passage{white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f4f8;padding:15px;max-height:420px;overflow:auto}small,.muted{color:#586982}.warning{background:#fff0d1;padding:14px;border-radius:6px}.tag{display:inline-block;border-radius:10px;padding:3px 10px;background:#e1eafa}.blocked{background:#ffe1de}label{display:block;margin:10px 0}h3{margin-bottom:7px}blockquote{margin:10px 0;padding:12px;border-left:4px solid #5277a9;background:#f5f7fb}details{margin:12px 0}summary{cursor:pointer}a{color:#234b83}.hidden{display:none}
+</style>
+<header><div><h1>Review synthetic legal questions</h1><p class="muted">Verify the question and every answer claim against the source. Machine checks do not certify legal correctness.</p><div class="toolbar"><input id="reviewer" placeholder="Reviewer name" aria-label="Reviewer name"><select id="filter" aria-label="Filter"><option value="all">All candidates</option><option value="pending">Pending</option><option value="approve">Approved</option><option value="reject">Rejected</option></select><button id="download">Download decisions.json</button><button id="restore">Load saved decisions</button><input id="file" type="file" accept=".json" hidden><span id="counts"></span></div><small id="storage"></small></div></header>
+<main><div class="warning">Approve only after checking source scope, conditions, amendments, completeness, language and evidence. “Additional gold” suggestions match exact supporting quotes but still need your review. This page never sends data over the network. Download decisions before closing; browser storage may be unavailable for local files.</div><p id="run"></p><div id="cards"></div></main>
+<script id="data" type="application/json">__DATA_JSON__</script>
+<script>
+'use strict';
+const pack=JSON.parse(document.getElementById('data').textContent);
+const key='legal-review:'+pack.fingerprint;
+let state={reviewer:'',decisions:{}};
+try {const saved=localStorage.getItem(key);if(saved)state=JSON.parse(saved)} catch(e){}
+const $=id=>document.getElementById(id);
+function element(tag,text,parent,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;if(parent)parent.appendChild(e);return e}
+function save(){try{localStorage.setItem(key,JSON.stringify(state));$('storage').textContent='Decisions saved in this browser. Download the decisions file for export.'}catch(e){$('storage').textContent='Browser storage unavailable. Download decisions before closing.'}counts()}
+function counts(){const ds=pack.candidates.map(c=>state.decisions[c.row.question_id]?.status||'pending');$('counts').textContent=`${ds.filter(x=>x==='approve').length} approved / ${ds.length} rows`;const filter=$('filter').value;for(const card of document.querySelectorAll('article'))card.classList.toggle('hidden',filter!=='all'&&(state.decisions[card.dataset.id]?.status||'pending')!==filter)}
+function metadata(source){return JSON.stringify({document_id:source.document_id,chunk_id:source.chunk_id,article:source.article,section:source.section,pages:[source.page_start,source.page_end],document_hash:source.document_hash,chunk_version:source.chunk_version,chunk_metadata:source.metadata,document_metadata:source.document_metadata},null,2)}
+$('reviewer').value=state.reviewer;
+$('reviewer').addEventListener('input',()=>{state.reviewer=$('reviewer').value;save()});
+$('filter').addEventListener('change',counts);
+$('run').textContent=`Run ${pack.run_id} | Generator: ${pack.config.model} | Verifier: ${pack.config.verifier_model} | Same-model verification: ${pack.config.model===pack.config.verifier_model?'yes (not independent)':'no'}`;
+function render(){
+$('cards').replaceChildren();
+const groups = [...new Set(pack.candidates.map(c=>c.row.group_id))];
+for(const group of groups){
+ const members=pack.candidates.filter(c=>c.row.group_id===group);
+ const summary=element('section',undefined,$('cards'));
+ element('h2',group+' — compare translations',summary);
+ for(const c of members){element('h3',c.row.language,summary);element('p',state.decisions[c.row.question_id]?.edits?.question||c.row.question,summary);element('p',state.decisions[c.row.question_id]?.edits?.reference_answer||c.row.reference_answer,summary)}
+ const reject=element('button','Reject whole group',summary);reject.onclick=()=>{for(const c of members){const id=c.row.question_id;state.decisions[id]={...(state.decisions[id]||{}),question_id:id,status:'reject',notes:state.decisions[id]?.notes||'',additional_gold_chunk_ids:state.decisions[id]?.additional_gold_chunk_ids||[]}}save();render()};
+}
+
+for(const c of pack.candidates){
+const id=c.row.question_id;
+const d=state.decisions[id]||(state.decisions[id]={question_id:id,status:'pending',notes:'',additional_gold_chunk_ids:[]});
+const card=element('article',undefined,$('cards'));card.dataset.id=id;
+element('small',`${id} · ${c.row.language} · ${c.row.domain}`,card);
+element('h2',c.row.question,card);
+element('span',c.machine_passed?'Machine checks passed — review required':'Machine rejected — export blocked',card,'tag'+(c.machine_passed?'':' blocked'));
+element('h3','Draft reference answer',card);element('p',c.row.reference_answer,card);
+const editor=element('details',undefined,card);element('summary','Edit candidate then run recheck',editor);
+for(const field of ['question','reference_answer','claims']){
+ const lab=element('label',field==='claims'?'Claims JSON with exact supporting quotes':field,editor);
+ const input=element('textarea',undefined,lab);
+ input.value=field==='claims'?JSON.stringify(d.edits?.claims||c.draft.claims,null,2):(d.edits?.[field]||c.row[field]);
+ input.onchange=()=>{try{const value=field==='claims'?JSON.parse(input.value):input.value;if(field==='claims'&&!Array.isArray(value))throw Error('Claims must be a JSON array.');d.edits={...(d.edits||{}),[field]:value};d.status='pending';save();render()}catch(e){alert(e.message)}};
+}
+if(d.edits)element('p','Edited draft: download decisions and run recheck. This snapshot cannot export edited approvals.',card,'warning');
+element('h3','Claims and exact source excerpts',card);
+for(const claim of c.draft.claims){element('p',claim.claim,card);element('blockquote',claim.supporting_quote,card)}
+const src=element('details',undefined,card);src.open=true;element('summary','Read full source passage',src);element('div',c.source.text,src,'passage');
+const meta=element('details',undefined,card);element('summary','IDs, page/article, source version and metadata',meta);element('pre',metadata(c.source),meta);
+element('p','Verifier: '+c.verdict.reason,card,'muted');
+if(c.source.metadata?.metadata_review_required||c.source.document_metadata?.metadata_review_required)element('p','Source metadata needs review. Confirm title, jurisdiction, legal status and version before approving.',card,'warning');
+if(c.alternative_chunk_ids.length){const alt=element('details',undefined,card);element('summary',`${c.alternative_chunk_ids.length} possible additional gold chunks — inspect before selecting`,alt);for(const cid of c.alternative_chunk_ids){const label=element('label',undefined,alt);const box=element('input',undefined,label);box.type='checkbox';box.checked=d.additional_gold_chunk_ids.includes(cid);box.disabled=!c.machine_passed;label.appendChild(document.createTextNode(' '+cid));box.addEventListener('change',()=>{const members=pack.candidates.filter(x=>x.row.group_id===c.row.group_id);if(box.checked&&members.some(x=>!x.alternative_chunk_ids.includes(cid))){box.checked=false;alert('This alternative is not valid for every translation. Review the evidence/quotes first.');return}for(const m of members){const md=state.decisions[m.row.question_id];md.additional_gold_chunk_ids=box.checked?[...new Set([...md.additional_gold_chunk_ids,cid])]:md.additional_gold_chunk_ids.filter(x=>x!==cid)}save();render()});const detail=element('details',undefined,alt);element('summary','Source text and locators',detail);element('pre',metadata(pack.sources[cid]),detail);element('div',pack.sources[cid].text,detail,'passage')}}
+const label=element('label','Decision: ',card);const select=element('select',undefined,label);for(const [v,t] of [['pending','Pending'],['approve','Approve — evidence and answer verified'],['reject','Reject']]){const o=element('option',t,select);o.value=v;if(v==='approve'&&(!c.machine_passed||d.edits))o.disabled=true}select.value=d.status;select.addEventListener('change',()=>{d.status=select.value;save()});
+const noteLabel=element('label','Review notes (required corrections, missing evidence, etc.)',card);const notes=element('textarea',undefined,noteLabel);notes.value=d.notes;notes.addEventListener('input',()=>{d.notes=notes.value;save()});
+}
+counts();}
+$('download').addEventListener('click',()=>{if(!state.reviewer.trim()){alert('Enter reviewer name first.');return}const data={run_id:pack.run_id,fingerprint:pack.fingerprint,reviewer:state.reviewer.trim(),reviewed_at:new Date().toISOString(),decisions:pack.candidates.map(c=>state.decisions[c.row.question_id])};const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=element('a');a.href=url;a.download='decisions.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)});
+$('restore').addEventListener('click',()=>$('file').click());
+$('file').addEventListener('change',async()=>{try{const data=JSON.parse(await $('file').files[0].text());if(data.fingerprint!==pack.fingerprint||data.run_id!==pack.run_id)throw Error('This file belongs to a different review snapshot.');const valid=new Set(pack.candidates.map(c=>c.row.question_id));const loaded={};for(const d of data.decisions){if(!valid.has(d.question_id)||loaded[d.question_id]||!['pending','approve','reject'].includes(d.status)||!Array.isArray(d.additional_gold_chunk_ids))throw Error('Invalid decisions.');loaded[d.question_id]=d}state={reviewer:String(data.reviewer||''),decisions:loaded};$('reviewer').value=state.reviewer;render();save()}catch(e){alert(e.message)}finally{$('file').value=''}});
+render();
+</script></html>

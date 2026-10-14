@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+ENV/
+.env
+.env.*
+!.env.example
+
+# Node / Vite
+node_modules/
+dist/
+coverage/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local application data and generated backups
+backend/data/uploads/
+backend/data/qdrant/
+backend/data/exports/
+upgrade_backups/
+
+# Logs and OS-generated files
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini

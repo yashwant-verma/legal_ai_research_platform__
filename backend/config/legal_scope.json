@@ -1,0 +1,22 @@
+{
+  "scope_version": "seven_domains_v1",
+  "description": "Selected Indian central legal texts; verify each downloaded edition and commencement before benchmark use.",
+  "corpus_language": "en",
+  "query_languages": ["en", "hi", "hinglish"],
+  "acts": [
+    {"act_id":"COI","domain":"constitutional_law","title":"Constitution of India","document_type":"constitution"},
+    {"act_id":"BNS_2023","domain":"criminal_law","title":"Bharatiya Nyaya Sanhita, 2023","document_type":"statute"},
+    {"act_id":"BNSS_2023","domain":"criminal_law","title":"Bharatiya Nagarik Suraksha Sanhita, 2023","document_type":"statute"},
+    {"act_id":"BSA_2023","domain":"criminal_law","title":"Bharatiya Sakshya Adhiniyam, 2023","document_type":"statute"},
+    {"act_id":"IT_2000","domain":"cyber_law","title":"Information Technology Act, 2000","document_type":"statute"},
+    {"act_id":"CPA_2019","domain":"consumer_law","title":"Consumer Protection Act, 2019","document_type":"statute"},
+    {"act_id":"ICA_1872","domain":"contract_law","title":"Indian Contract Act, 1872","document_type":"statute"},
+    {"act_id":"SRA_1963","domain":"contract_law","title":"Specific Relief Act, 1963","document_type":"statute"},
+    {"act_id":"TPA_1882","domain":"property_law","title":"Transfer of Property Act, 1882","document_type":"statute"},
+    {"act_id":"REG_1908","domain":"property_law","title":"Registration Act, 1908","document_type":"statute"},
+    {"act_id":"RERA_2016","domain":"property_law","title":"Real Estate (Regulation and Development) Act, 2016","document_type":"statute"},
+    {"act_id":"HMA_1955","domain":"family_law","title":"Hindu Marriage Act, 1955","document_type":"statute"},
+    {"act_id":"SMA_1954","domain":"family_law","title":"Special Marriage Act, 1954","document_type":"statute"},
+    {"act_id":"PWDVA_2005","domain":"family_law","title":"Protection of Women from Domestic Violence Act, 2005","document_type":"statute"}
+  ]
+}

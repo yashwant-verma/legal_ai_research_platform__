@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Factual dataset review</title>
+<style>body{font:16px/1.55 system-ui;background:#f4f6fa;color:#172b45;margin:0}main{max-width:1100px;margin:auto;padding:28px}header{position:sticky;top:0;background:#f4f6fa;padding:12px 0;border-bottom:1px solid #bbb;z-index:1}article{background:white;border:1px solid #d5dce5;border-radius:10px;margin:24px 0;padding:24px}button,input,textarea{font:inherit}button{background:#184c87;color:white;border:0;border-radius:6px;padding:10px;cursor:pointer}input,textarea{box-sizing:border-box;width:100%;padding:9px;border:1px solid #b1bfd0;border-radius:5px}textarea{min-height:80px}label{display:block;margin-top:12px}pre{white-space:pre-wrap;background:#eef2f8;padding:16px;overflow-wrap:anywhere}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.row input{width:auto}.notice{background:#fff0cc;padding:12px}.language{border-top:1px solid #ddd;margin-top:15px;padding-top:8px}.error{color:#a01818}small{color:#52617a}</style>
+<main><h1>Factual question groups</h1><p>Verify each reference against the source, check applicable version and exceptions, and confirm that all three questions have the same meaning. Automated checks do not establish legal correctness.</p>
+<header><div class="row"><input id="reviewer" placeholder="Reviewer name" aria-label="Reviewer name"><button id="save">Download review progress</button><label>Load progress<input type="file" id="load" accept=".json"></label><button id="export">Download reviewed dataset</button><strong id="status"></strong></div><p id="message" role="status"></p></header>
+<p class="notice">Only individually approved, complete groups are exported. Editing an approved group clears its approval. Keep a downloaded progress file before closing. No network requests are made by this page. For reference corrections needing a different source, reject this group and regenerate it.</p><div id="groups"></div></main>
+<script id="pack" type="application/json">__PACK__</script><script>
+const pack=JSON.parse(document.getElementById('pack').textContent), state={fingerprint:pack.run_fingerprint,reviewer:'',groups:{}};
+const $=id=>document.getElementById(id), msg=t=>$('message').textContent=t;
+function element(tag,text,parent){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(parent)parent.append(e);return e;}
+function download(name,value){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function status(){const n=Object.values(state.groups).filter(g=>g.approved).length;$('status').textContent=`${n}/${pack.groups.length} groups approved · ${n*3} rows`;}
+function render(){
+ $('groups').replaceChildren();
+ for(const g of pack.groups){
+  const id=g.rows[0].group_id;
+  const s=state.groups[id]||(state.groups[id]={approved:false,canonical:JSON.stringify(g.rows[0].factual.canonical_answer,null,2),rows:structuredClone(g.rows)});
+  const a=element('article',undefined,$('groups'));element('h2',`${id} · ${s.rows[0].domain} · ${s.rows[0].factual.split}`,a);
+  element('p',`${g.source.document_metadata.title} · version ${s.rows[0].factual.source_version} · pages ${g.source.page_start}–${g.source.page_end}`,a);
+  element('small',`${g.source.document_id} / ${g.source.chunk_id}`,a);
+  const d=element('details',undefined,a);element('summary','Read complete source chunk',d);element('pre',g.source.text,d);
+  element('h3','Supporting quote',a);element('pre',s.rows[0].factual.supporting_quotes[0].quote,a);
+  const cl=element('label','Canonical answer (shared by all translations)',a), ct=element('textarea',undefined,cl);ct.value=s.canonical;ct.rows=5;
+  const approval=element('input');approval.type='checkbox';approval.checked=s.approved;
+  function changed(){s.approved=false;approval.checked=false;status();}
+  ct.oninput=()=>{s.canonical=ct.value;changed();};
+  for(const row of s.rows){
+   const block=element('div',undefined,a);block.className='language';element('h3',row.language,block);
+   for(const [key,title] of [['question','Question'],['reference_answer','Reference answer']]){
+    const l=element('label',title,block),t=element('textarea',undefined,l);t.value=row[key];t.oninput=()=>{row[key]=t.value;changed();};
+   }
+   if(row.factual.answer_type==='short_text'){
+    const l=element('label','Verified aliases, one per line',block),t=element('textarea',undefined,l);t.value=row.factual.accepted_aliases.join('\n');t.oninput=()=>{row.factual.accepted_aliases=t.value.split('\n').map(x=>x.trim()).filter(Boolean);changed();};
+   }
+  }
+  const l=element('label',undefined,a);l.className='row';l.append(approval);element('span','I checked source support, version/scope, canonical answer and all three translations.',l);
+  approval.onchange=()=>{s.approved=approval.checked;status();};
+ }
+ status();
+}
+$('reviewer').oninput=e=>state.reviewer=e.target.value.trim();
+$('save').onclick=()=>download('factual_review_progress.json',state);
+$('load').onchange=async e=>{try{const data=JSON.parse(await e.target.files[0].text());if(data.fingerprint!==pack.run_fingerprint)throw Error('Progress belongs to another run/revision.');state.groups=data.groups;state.reviewer=data.reviewer||'';$('reviewer').value=state.reviewer;render();msg('Progress restored.');}catch(err){msg(err.message);}};
+$('export').onclick=()=>{try{
+ if(!state.reviewer)throw Error('Enter the reviewer name.');const rows=[];
+ for(const s of Object.values(state.groups))if(s.approved){
+  const canonical=JSON.parse(s.canonical);
+  if(canonical.act_id!==s.rows[0].factual.act_id)throw Error('Canonical Act ID must match declared question scope.');
+  if(!Array.isArray(canonical.values)||!canonical.values.length)throw Error('Canonical values are missing.');
+  for(const original of s.rows){const row=structuredClone(original);if(!row.question.trim()||!row.reference_answer.trim())throw Error('A question or reference is empty.');
+   row.factual.canonical_answer=canonical;row.factual.review_status='verified';row.factual.reviewer=state.reviewer;row.factual.reviewed_at=new Date().toISOString();
+   row.notes=`Gemini-assisted; reviewed by ${state.reviewer}. Progress fingerprint ${pack.run_fingerprint}.`;rows.push(row);
+  }
+ }
+ if(!rows.length)throw Error('Approve at least one complete group.');
+ download('reviewed_dataset.json',rows);download('factual_review_progress.json',state);
+ const counts={};for(const r of rows)if(r.language==='en'){const key=r.domain+'/'+r.factual.split;counts[key]=(counts[key]||0)+1;}
+ msg('Exported '+rows.length+' rows. Group coverage: '+JSON.stringify(counts)+'. Import validates structure; preflight checks current sources.');
+ }catch(err){msg(err.message);}};
+render();
+</script></html>

@@ -1,0 +1,27 @@
+{
+  "name": "legal-ai-research-platform-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run --environment jsdom tests/chat_modes.test.jsx tests/research_ui.test.jsx tests/factual_ui.test.jsx tests/factual_review.test.jsx && node --test tests/chat_stream.test.mjs"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "axios": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router-dom": "latest",
+    "recharts": "latest"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "jsdom": "^30.0.1",
+    "vite": "latest",
+    "vitest": "^5.0.0"
+  }
+}
